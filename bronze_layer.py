@@ -1,148 +1,127 @@
 
-# ============================================================
-# RETAIL DEMAND FORECASTING PROJECT
-# RAW TO BRONZE ETL PIPELINE
-# AWS GLUE + PYSPARK
-# ============================================================
+import sys
 
 from pyspark.context import SparkContext
-from pyspark.sql.functions import current_timestamp, input_file_name
+from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, StringType
+
 from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
+from awsglue.job import Job
+from awsglue.utils import getResolvedOptions
 
+# --------------------------------------------------
+# CONFIGURATION
+# --------------------------------------------------
 
-# ------------------------------------------------------------
-# 1. INITIALIZE SPARK AND GLUE
-# ------------------------------------------------------------
+args = getResolvedOptions(
+    sys.argv,
+    ["JOB_NAME", "S3_BUCKET_NAME", "RAW_DATABASE"]
+)
+
+BUCKET = args["S3_BUCKET_NAME"]
+RAW_DATABASE = args["RAW_DATABASE"]
+
+RAW_ONLINE_RETAIL = (
+    f"s3://{BUCKET}/raw/online_retail/Online_Retail.csv"
+)
+BRONZE_PATH = f"s3://{BUCKET}/bronze/"
+
+# --------------------------------------------------
+# INITIALIZE
+# --------------------------------------------------
 
 sc = SparkContext.getOrCreate()
 glueContext = GlueContext(sc)
 spark = glueContext.spark_session
 
-print("AWS Glue ETL Started")
+job = Job(glueContext)
+job.init(args["JOB_NAME"], args)
 
+# Read source CSV fields as strings so malformed numeric
+# values do not abort ingestion.
+online_schema = StructType([
+    StructField("Invoice", StringType(), True),
+    StructField("StockCode", StringType(), True),
+    StructField("Description", StringType(), True),
+    StructField("Quantity", StringType(), True),
+    StructField("InvoiceDate", StringType(), True),
+    StructField("Price", StringType(), True),
+    StructField("Customer ID", StringType(), True),
+    StructField("Country", StringType(), True),
+    StructField("_corrupt_record", StringType(), True)
+])
 
-# ------------------------------------------------------------
-# 2. CONFIGURATION
-# ------------------------------------------------------------
+def add_metadata(df):
+    return (
+        df
+        .withColumn("ingestion_timestamp", F.current_timestamp())
+        .withColumn("source_file", F.input_file_name())
+    )
 
-database_name = "online_inventory"
+def write_bronze(df, table_name):
+    target = f"{BRONZE_PATH}{table_name}/"
 
-bucket_name = "online-retail-inventory-project"
+    (
+        add_metadata(df)
+        .write
+        .mode("overwrite")
+        .format("parquet")
+        .save(target)
+    )
 
-bronze_path = f"s3://{bucket_name}/bronze/"
+    print(f"Written Bronze table: {table_name} -> {target}")
 
-error_path = f"s3://{bucket_name}/bronze_errors/"
+# --------------------------------------------------
+# 1. ONLINE RETAIL
+# --------------------------------------------------
 
-table_names = [
-    "suppliers",
+print("Reading raw Online Retail CSV")
+
+online_df = (
+    spark.read
+    .format("csv")
+    .option("header", "true")
+    .option("encoding", "ISO-8859-1")
+    .option("quote", '"')
+    .option("escape", '"')
+    .option("mode", "PERMISSIVE")
+    .option("columnNameOfCorruptRecord", "_corrupt_record")
+    .schema(online_schema)
+    .load(RAW_ONLINE_RETAIL)
+)
+
+write_bronze(online_df, "online_retail")
+
+# --------------------------------------------------
+# 2. PRODUCTS, SUPPLIERS, INVENTORY
+# --------------------------------------------------
+
+for table_name in ["products", "suppliers", "inventory"]:
+
+    print(f"Reading raw Catalog table: {table_name}")
+
+    source_dyf = glueContext.create_dynamic_frame.from_catalog(
+        database=RAW_DATABASE,
+        table_name=table_name,
+        transformation_ctx=f"source_{table_name}"
+    )
+
+    source_df = source_dyf.toDF()
+    write_bronze(source_df, table_name)
+
+# --------------------------------------------------
+# 3. VALIDATE OUTPUTS
+# --------------------------------------------------
+
+for table_name in [
+    "online_retail",
     "products",
-    "inventory",
-    "online_retail"
-]
-
-
-# ------------------------------------------------------------
-# 3. PROCESS ALL FOUR DATASETS
-# ------------------------------------------------------------
-
-for table_name in table_names:
-
-    print(f"\nProcessing: {table_name}")
-
-    try:
-
-        # ----------------------------------------------------
-        # READ DATA FROM GLUE CATALOG
-        # ----------------------------------------------------
-
-        if table_name == "online_retail":
-
-            print("Using special CSV parsing configuration")
-
-            # Read Online Retail directly from its Catalog
-            # underlying S3 location, with explicit CSV options.
-            catalog_table = glueContext.create_dynamic_frame.from_catalog(
-                database=database_name,
-                table_name=table_name,
-                transformation_ctx=f"source_{table_name}"
-            )
-
-            # Convert to DataFrame with permissive CSV parsing
-            # NOTE: This conversion cannot change the CSV options
-            # already used by the Catalog reader. See explanation below.
-
-            df = catalog_table.toDF()
-
-        else:
-
-            # Normal Catalog reading for other datasets
-            dynamic_frame = glueContext.create_dynamic_frame.from_catalog(
-                database=database_name,
-                table_name=table_name,
-                transformation_ctx=f"source_{table_name}"
-            )
-
-            df = dynamic_frame.toDF()
-
-
-        # ----------------------------------------------------
-        # ADD INGESTION TIMESTAMP
-        # ----------------------------------------------------
-
-        df = df.withColumn(
-            "ingestion_timestamp",
-            current_timestamp()
-        )
-
-
-        # ----------------------------------------------------
-        # WRITE TO BRONZE
-        # ----------------------------------------------------
-
-        target_path = bronze_path + table_name + "/"
-
-        df.write \
-            .mode("overwrite") \
-            .format("parquet") \
-            .save(target_path)
-
-        print(f"Successfully stored {table_name} in Bronze")
-
-
-    except Exception as e:
-
-        print(f"ERROR processing {table_name}: {str(e)}")
-
-        raise
-
-
-# ------------------------------------------------------------
-# 4. VERIFY BRONZE DATA
-# ------------------------------------------------------------
-
-print("\n========== BRONZE VERIFICATION ==========")
-
-for table_name in table_names:
-
-    path = bronze_path + table_name + "/"
-
-    df = spark.read.parquet(path)
-
-    print(f"\nDataset: {table_name}")
-
-    print("Total Records:", df.count())
-
+    "suppliers",
+    "inventory"
+]:
+    df = spark.read.parquet(f"{BRONZE_PATH}{table_name}/")
+    print(f"{table_name}: {df.count()} rows")
     df.printSchema()
 
-    df.show(5, truncate=False)
-
-
-# ------------------------------------------------------------
-# 5. COMPLETION
-# ------------------------------------------------------------
-
-print("\n========================================")
-print("RAW TO BRONZE ETL COMPLETED")
-print("ALL DATASETS PROCESSED")
-print("========================================")
+job.commit()
+print("Bronze ETL completed.")
