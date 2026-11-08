@@ -1,0 +1,16 @@
+supplier_id,supplier_name,lead_time_days,minimum_order_quantity,reorder_multiple
+SUP001,Supplier_001,8,20,1
+SUP002,Supplier_002,5,15,1
+SUP003,Supplier_003,14,50,1
+SUP004,Supplier_004,12,25,10
+SUP005,Supplier_005,9,10,10
+SUP006,Supplier_006,14,20,10
+SUP007,Supplier_007,6,50,5
+SUP008,Supplier_008,8,50,10
+SUP009,Supplier_009,11,10,5
+SUP010,Supplier_010,4,20,5
+SUP011,Supplier_011,8,25,10
+SUP012,Supplier_012,12,5,5
+SUP013,Supplier_013,12,20,10
+SUP014,Supplier_014,9,10,10
+SUP015,Supplier_015,6,50,1
