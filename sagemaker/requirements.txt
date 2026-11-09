@@ -1,0 +1,11 @@
+# Tested-compatible pinned environment for Python 3.10 or 3.11.
+# Install with: python -m pip install -r requirements.txt
+numpy==1.26.4
+pandas==2.2.3
+scipy==1.13.1
+pyarrow==17.0.0
+awswrangler==3.9.1
+boto3==1.35.99
+xgboost==2.1.4
+scikit-learn==1.5.2
+psycopg2-binary==2.9.10

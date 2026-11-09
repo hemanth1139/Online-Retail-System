@@ -1,0 +1,937 @@
+{
+  "Comment": "End-to-End Retail Demand Forecasting Pipeline with 4 Raw, 4 Bronze, 7 Silver, and 3 Gold Crawlers",
+  "StartAt": "Raw_Crawlers_Parallel",
+  "States": {
+    "Raw_Crawlers_Parallel": {
+      "Type": "Parallel",
+      "Comment": "Stage 1: Run 4 Raw Crawlers concurrently and wait for completion",
+      "Next": "Bronze_Glue_ETL",
+      "Branches": [
+        {
+          "StartAt": "Start_Raw_Crawler_1",
+          "States": {
+            "Start_Raw_Crawler_1": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "online_retail"
+              },
+              "Next": "Wait_Raw_Crawler_1"
+            },
+            "Wait_Raw_Crawler_1": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Raw_Crawler_1_Status"
+            },
+            "Get_Raw_Crawler_1_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "online_retail"
+              },
+              "Next": "Check_Raw_Crawler_1_Ready"
+            },
+            "Check_Raw_Crawler_1_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Raw_Crawler_1_Done"
+                }
+              ],
+              "Default": "Wait_Raw_Crawler_1"
+            },
+            "Raw_Crawler_1_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Raw_Crawler_2",
+          "States": {
+            "Start_Raw_Crawler_2": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "inventory"
+              },
+              "Next": "Wait_Raw_Crawler_2"
+            },
+            "Wait_Raw_Crawler_2": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Raw_Crawler_2_Status"
+            },
+            "Get_Raw_Crawler_2_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "inventory"
+              },
+              "Next": "Check_Raw_Crawler_2_Ready"
+            },
+            "Check_Raw_Crawler_2_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Raw_Crawler_2_Done"
+                }
+              ],
+              "Default": "Wait_Raw_Crawler_2"
+            },
+            "Raw_Crawler_2_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Raw_Crawler_3",
+          "States": {
+            "Start_Raw_Crawler_3": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "suppliers"
+              },
+              "Next": "Wait_Raw_Crawler_3"
+            },
+            "Wait_Raw_Crawler_3": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Raw_Crawler_3_Status"
+            },
+            "Get_Raw_Crawler_3_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "suppliers"
+              },
+              "Next": "Check_Raw_Crawler_3_Ready"
+            },
+            "Check_Raw_Crawler_3_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Raw_Crawler_3_Done"
+                }
+              ],
+              "Default": "Wait_Raw_Crawler_3"
+            },
+            "Raw_Crawler_3_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Raw_Crawler_4",
+          "States": {
+            "Start_Raw_Crawler_4": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "products"
+              },
+              "Next": "Wait_Raw_Crawler_4"
+            },
+            "Wait_Raw_Crawler_4": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Raw_Crawler_4_Status"
+            },
+            "Get_Raw_Crawler_4_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "products"
+              },
+              "Next": "Check_Raw_Crawler_4_Ready"
+            },
+            "Check_Raw_Crawler_4_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Raw_Crawler_4_Done"
+                }
+              ],
+              "Default": "Wait_Raw_Crawler_4"
+            },
+            "Raw_Crawler_4_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+    "Bronze_Glue_ETL": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "project_bronze_layer"
+      },
+      "Next": "Bronze_Crawlers_Parallel",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Glue.ConcurrentRunsExceededException",
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "Bronze_Crawlers_Parallel": {
+      "Type": "Parallel",
+      "Comment": "Stage 2: Run 4 Bronze Crawlers concurrently and wait for completion",
+      "Next": "Silver_Glue_ETL",
+      "Branches": [
+        {
+          "StartAt": "Start_Bronze_Crawler_1",
+          "States": {
+            "Start_Bronze_Crawler_1": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "inventory_bronze"
+              },
+              "Next": "Wait_Bronze_Crawler_1"
+            },
+            "Wait_Bronze_Crawler_1": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Bronze_Crawler_1_Status"
+            },
+            "Get_Bronze_Crawler_1_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "inventory_bronze"
+              },
+              "Next": "Check_Bronze_Crawler_1_Ready"
+            },
+            "Check_Bronze_Crawler_1_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Bronze_Crawler_1_Done"
+                }
+              ],
+              "Default": "Wait_Bronze_Crawler_1"
+            },
+            "Bronze_Crawler_1_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Bronze_Crawler_2",
+          "States": {
+            "Start_Bronze_Crawler_2": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "suppliers_bronze"
+              },
+              "Next": "Wait_Bronze_Crawler_2"
+            },
+            "Wait_Bronze_Crawler_2": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Bronze_Crawler_2_Status"
+            },
+            "Get_Bronze_Crawler_2_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "suppliers_bronze"
+              },
+              "Next": "Check_Bronze_Crawler_2_Ready"
+            },
+            "Check_Bronze_Crawler_2_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Bronze_Crawler_2_Done"
+                }
+              ],
+              "Default": "Wait_Bronze_Crawler_2"
+            },
+            "Bronze_Crawler_2_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Bronze_Crawler_3",
+          "States": {
+            "Start_Bronze_Crawler_3": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "products_bronze"
+              },
+              "Next": "Wait_Bronze_Crawler_3"
+            },
+            "Wait_Bronze_Crawler_3": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Bronze_Crawler_3_Status"
+            },
+            "Get_Bronze_Crawler_3_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "products_bronze"
+              },
+              "Next": "Check_Bronze_Crawler_3_Ready"
+            },
+            "Check_Bronze_Crawler_3_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Bronze_Crawler_3_Done"
+                }
+              ],
+              "Default": "Wait_Bronze_Crawler_3"
+            },
+            "Bronze_Crawler_3_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Bronze_Crawler_4",
+          "States": {
+            "Start_Bronze_Crawler_4": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "online_retail_bronze"
+              },
+              "Next": "Wait_Bronze_Crawler_4"
+            },
+            "Wait_Bronze_Crawler_4": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Bronze_Crawler_4_Status"
+            },
+            "Get_Bronze_Crawler_4_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "online_retail_bronze"
+              },
+              "Next": "Check_Bronze_Crawler_4_Ready"
+            },
+            "Check_Bronze_Crawler_4_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Bronze_Crawler_4_Done"
+                }
+              ],
+              "Default": "Wait_Bronze_Crawler_4"
+            },
+            "Bronze_Crawler_4_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+    "Silver_Glue_ETL": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "project_silver_layer"
+      },
+      "Next": "Silver_Crawlers_Parallel",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Glue.ConcurrentRunsExceededException",
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "Silver_Crawlers_Parallel": {
+      "Type": "Parallel",
+      "Comment": "Stage 3: Run 7 Silver Crawlers concurrently and wait for completion",
+      "Next": "Gold_Glue_ETL",
+      "Branches": [
+        {
+          "StartAt": "Start_Silver_Crawler_1",
+          "States": {
+            "Start_Silver_Crawler_1": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "cancellations"
+              },
+              "Next": "Wait_Silver_Crawler_1"
+            },
+            "Wait_Silver_Crawler_1": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Silver_Crawler_1_Status"
+            },
+            "Get_Silver_Crawler_1_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "cancellations"
+              },
+              "Next": "Check_Silver_Crawler_1_Ready"
+            },
+            "Check_Silver_Crawler_1_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Silver_Crawler_1_Done"
+                }
+              ],
+              "Default": "Wait_Silver_Crawler_1"
+            },
+            "Silver_Crawler_1_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Silver_Crawler_2",
+          "States": {
+            "Start_Silver_Crawler_2": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "suppliers_silver"
+              },
+              "Next": "Wait_Silver_Crawler_2"
+            },
+            "Wait_Silver_Crawler_2": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Silver_Crawler_2_Status"
+            },
+            "Get_Silver_Crawler_2_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "suppliers_silver"
+              },
+              "Next": "Check_Silver_Crawler_2_Ready"
+            },
+            "Check_Silver_Crawler_2_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Silver_Crawler_2_Done"
+                }
+              ],
+              "Default": "Wait_Silver_Crawler_2"
+            },
+            "Silver_Crawler_2_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Silver_Crawler_3",
+          "States": {
+            "Start_Silver_Crawler_3": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "inventory_silver"
+              },
+              "Next": "Wait_Silver_Crawler_3"
+            },
+            "Wait_Silver_Crawler_3": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Silver_Crawler_3_Status"
+            },
+            "Get_Silver_Crawler_3_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "inventory_silver"
+              },
+              "Next": "Check_Silver_Crawler_3_Ready"
+            },
+            "Check_Silver_Crawler_3_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Silver_Crawler_3_Done"
+                }
+              ],
+              "Default": "Wait_Silver_Crawler_3"
+            },
+            "Silver_Crawler_3_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Silver_Crawler_4",
+          "States": {
+            "Start_Silver_Crawler_4": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "products_silver"
+              },
+              "Next": "Wait_Silver_Crawler_4"
+            },
+            "Wait_Silver_Crawler_4": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Silver_Crawler_4_Status"
+            },
+            "Get_Silver_Crawler_4_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "products_silver"
+              },
+              "Next": "Check_Silver_Crawler_4_Ready"
+            },
+            "Check_Silver_Crawler_4_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Silver_Crawler_4_Done"
+                }
+              ],
+              "Default": "Wait_Silver_Crawler_4"
+            },
+            "Silver_Crawler_4_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Silver_Crawler_5",
+          "States": {
+            "Start_Silver_Crawler_5": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "rejected"
+              },
+              "Next": "Wait_Silver_Crawler_5"
+            },
+            "Wait_Silver_Crawler_5": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Silver_Crawler_5_Status"
+            },
+            "Get_Silver_Crawler_5_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "rejected"
+              },
+              "Next": "Check_Silver_Crawler_5_Ready"
+            },
+            "Check_Silver_Crawler_5_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Silver_Crawler_5_Done"
+                }
+              ],
+              "Default": "Wait_Silver_Crawler_5"
+            },
+            "Silver_Crawler_5_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Silver_Crawler_6",
+          "States": {
+            "Start_Silver_Crawler_6": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "returns_silver"
+              },
+              "Next": "Wait_Silver_Crawler_6"
+            },
+            "Wait_Silver_Crawler_6": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Silver_Crawler_6_Status"
+            },
+            "Get_Silver_Crawler_6_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "returns_silver"
+              },
+              "Next": "Check_Silver_Crawler_6_Ready"
+            },
+            "Check_Silver_Crawler_6_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Silver_Crawler_6_Done"
+                }
+              ],
+              "Default": "Wait_Silver_Crawler_6"
+            },
+            "Silver_Crawler_6_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Silver_Crawler_7",
+          "States": {
+            "Start_Silver_Crawler_7": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "sales_silver"
+              },
+              "Next": "Wait_Silver_Crawler_7"
+            },
+            "Wait_Silver_Crawler_7": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Silver_Crawler_7_Status"
+            },
+            "Get_Silver_Crawler_7_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "sales_silver"
+              },
+              "Next": "Check_Silver_Crawler_7_Ready"
+            },
+            "Check_Silver_Crawler_7_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Silver_Crawler_7_Done"
+                }
+              ],
+              "Default": "Wait_Silver_Crawler_7"
+            },
+            "Silver_Crawler_7_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+    "Gold_Glue_ETL": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "project_gold_layer"
+      },
+      "Next": "Gold_Crawlers_Parallel",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Glue.ConcurrentRunsExceededException",
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "Gold_Crawlers_Parallel": {
+      "Type": "Parallel",
+      "Comment": "Stage 4: Run 3 Gold Crawlers concurrently and wait for completion",
+      "Next": "SageMaker_Script_1_Model_Training",
+      "Branches": [
+        {
+          "StartAt": "Start_Gold_Crawler_1",
+          "States": {
+            "Start_Gold_Crawler_1": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "daily_product_sales_gold"
+              },
+              "Next": "Wait_Gold_Crawler_1"
+            },
+            "Wait_Gold_Crawler_1": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Gold_Crawler_1_Status"
+            },
+            "Get_Gold_Crawler_1_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "daily_product_sales_gold"
+              },
+              "Next": "Check_Gold_Crawler_1_Ready"
+            },
+            "Check_Gold_Crawler_1_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Gold_Crawler_1_Done"
+                }
+              ],
+              "Default": "Wait_Gold_Crawler_1"
+            },
+            "Gold_Crawler_1_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Gold_Crawler_2",
+          "States": {
+            "Start_Gold_Crawler_2": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "inventory_analytics_gold"
+              },
+              "Next": "Wait_Gold_Crawler_2"
+            },
+            "Wait_Gold_Crawler_2": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Gold_Crawler_2_Status"
+            },
+            "Get_Gold_Crawler_2_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "inventory_analytics_gold"
+              },
+              "Next": "Check_Gold_Crawler_2_Ready"
+            },
+            "Check_Gold_Crawler_2_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Gold_Crawler_2_Done"
+                }
+              ],
+              "Default": "Wait_Gold_Crawler_2"
+            },
+            "Gold_Crawler_2_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Start_Gold_Crawler_3",
+          "States": {
+            "Start_Gold_Crawler_3": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {
+                "Name": "product_demand_features_gold"
+              },
+              "Next": "Wait_Gold_Crawler_3"
+            },
+            "Wait_Gold_Crawler_3": {
+              "Type": "Wait",
+              "Seconds": 15,
+              "Next": "Get_Gold_Crawler_3_Status"
+            },
+            "Get_Gold_Crawler_3_Status": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {
+                "Name": "product_demand_features_gold"
+              },
+              "Next": "Check_Gold_Crawler_3_Ready"
+            },
+            "Check_Gold_Crawler_3_Ready": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Crawler.State",
+                  "StringEquals": "READY",
+                  "Next": "Gold_Crawler_3_Done"
+                }
+              ],
+              "Default": "Wait_Gold_Crawler_3"
+            },
+            "Gold_Crawler_3_Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+    "SageMaker_Script_1_Model_Training": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createProcessingJob.sync",
+      "Parameters": {
+        "ProcessingJobName.$": "States.Format('demand-training-{}', States.UUID())",
+        "AppSpecification": {
+          "ImageUri": "783357654285.dkr.ecr.ap-southeast-2.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3",
+          "ContainerEntrypoint": [
+            "python3",
+            "/opt/ml/processing/input/code/1_model_training.py"
+          ]
+        },
+        "ProcessingResources": {
+          "ClusterConfig": {
+            "InstanceCount": 1,
+            "InstanceType": "ml.t3.medium",
+            "VolumeSizeInGB": 5
+          }
+        },
+        "ProcessingInputs": [
+          {
+            "InputName": "code",
+            "S3Input": {
+              "S3Uri": "s3://<YOUR_BUCKET_NAME>/automations/scripts/",
+              "LocalPath": "/opt/ml/processing/input/code",
+              "S3DataType": "S3Prefix",
+              "S3InputMode": "File"
+            }
+          }
+        ],
+        "RoleArn": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/AmazonSageMakerAdminIAMExecutionRole"
+      },
+      "Next": "SageMaker_Script_2_Batch_Inference"
+    },
+    "SageMaker_Script_2_Batch_Inference": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createProcessingJob.sync",
+      "Parameters": {
+        "ProcessingJobName.$": "States.Format('demand-inference-{}', States.UUID())",
+        "AppSpecification": {
+          "ImageUri": "783357654285.dkr.ecr.ap-southeast-2.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3",
+          "ContainerEntrypoint": [
+            "python3",
+            "/opt/ml/processing/input/code/2_batch_inference.py"
+          ]
+        },
+        "ProcessingResources": {
+          "ClusterConfig": {
+            "InstanceCount": 1,
+            "InstanceType": "ml.t3.medium",
+            "VolumeSizeInGB": 5
+          }
+        },
+        "ProcessingInputs": [
+          {
+            "InputName": "code",
+            "S3Input": {
+              "S3Uri": "s3://<YOUR_BUCKET_NAME>/automations/scripts/",
+              "LocalPath": "/opt/ml/processing/input/code",
+              "S3DataType": "S3Prefix",
+              "S3InputMode": "File"
+            }
+          }
+        ],
+        "RoleArn": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/AmazonSageMakerAdminIAMExecutionRole"
+      },
+      "Next": "SageMaker_Script_3_RDS_Injector"
+    },
+    "SageMaker_Script_3_RDS_Injector": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createProcessingJob.sync",
+      "Parameters": {
+        "ProcessingJobName.$": "States.Format('demand-rds-injector-{}', States.UUID())",
+        "AppSpecification": {
+          "ImageUri": "783357654285.dkr.ecr.ap-southeast-2.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3",
+          "ContainerEntrypoint": [
+            "python3",
+            "/opt/ml/processing/input/code/3_inventory_rds_injector.py"
+          ]
+        },
+        "ProcessingResources": {
+          "ClusterConfig": {
+            "InstanceCount": 1,
+            "InstanceType": "ml.t3.medium",
+            "VolumeSizeInGB": 5
+          }
+        },
+        "ProcessingInputs": [
+          {
+            "InputName": "code",
+            "S3Input": {
+              "S3Uri": "s3://<YOUR_BUCKET_NAME>/automations/scripts/",
+              "LocalPath": "/opt/ml/processing/input/code",
+              "S3DataType": "S3Prefix",
+              "S3InputMode": "File"
+            }
+          }
+        ],
+        "Environment": {
+          "DB_HOST": "<YOUR_RDS_ENDPOINT>",
+          "DB_NAME": "postgres",
+          "DB_USER": "postgres",
+          "SECRET_NAME": "retail-pipeline/rds/credentials"
+        },
+        "RoleArn": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/AmazonSageMakerAdminIAMExecutionRole"
+      },
+      "End": true
+    }
+  }
+}
