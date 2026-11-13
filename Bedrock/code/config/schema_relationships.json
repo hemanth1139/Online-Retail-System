@@ -1,0 +1,82 @@
+{
+  "foreign_keys": [
+    {
+      "table": "orders",
+      "column": "customer_id",
+      "references_table": "customers",
+      "references_column": "customer_id"
+    },
+    {
+      "table": "orders",
+      "column": "employee_id",
+      "references_table": "employees",
+      "references_column": "employee_id"
+    },
+    {
+      "table": "orders",
+      "column": "ship_via",
+      "references_table": "shippers",
+      "references_column": "shipper_id"
+    },
+    {
+      "table": "order_details",
+      "column": "product_id",
+      "references_table": "products",
+      "references_column": "product_id"
+    },
+    {
+      "table": "order_details",
+      "column": "order_id",
+      "references_table": "orders",
+      "references_column": "order_id"
+    },
+    {
+      "table": "products",
+      "column": "category_id",
+      "references_table": "categories",
+      "references_column": "category_id"
+    },
+    {
+      "table": "products",
+      "column": "supplier_id",
+      "references_table": "suppliers",
+      "references_column": "supplier_id"
+    },
+    {
+      "table": "territories",
+      "column": "region_id",
+      "references_table": "region",
+      "references_column": "region_id"
+    },
+    {
+      "table": "employee_territories",
+      "column": "territory_id",
+      "references_table": "territories",
+      "references_column": "territory_id"
+    },
+    {
+      "table": "employee_territories",
+      "column": "employee_id",
+      "references_table": "employees",
+      "references_column": "employee_id"
+    },
+    {
+      "table": "customer_customer_demo",
+      "column": "customer_type_id",
+      "references_table": "customer_demographics",
+      "references_column": "customer_type_id"
+    },
+    {
+      "table": "customer_customer_demo",
+      "column": "customer_id",
+      "references_table": "customers",
+      "references_column": "customer_id"
+    },
+    {
+      "table": "employees",
+      "column": "reports_to",
+      "references_table": "employees",
+      "references_column": "employee_id"
+    }
+  ]
+}

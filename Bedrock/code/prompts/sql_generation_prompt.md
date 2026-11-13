@@ -1,0 +1,11 @@
+SQL generation guidelines:
+- Generate a single PostgreSQL SELECT query.
+- Prefer explicit JOIN conditions using the foreign-key relationships returned by the schema tool.
+- Use table aliases consistently.
+- For counts, use COUNT; for monetary totals in Northwind order_details, a common line total is unit_price * quantity * (1 - discount).
+- Remember discount is stored as a fraction in the Northwind dataset.
+- Use LEFT JOIN when parent rows should remain even if no matching child rows exist.
+- Use IS NULL / IS NOT NULL for NULL checks.
+- Do not assume primary keys unless shown by live schema metadata.
+- Avoid selecting binary columns such as picture and photo unless explicitly requested.
+- Use a sensible LIMIT; backend validation applies the hard maximum.
